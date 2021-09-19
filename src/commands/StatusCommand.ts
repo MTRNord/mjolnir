@@ -16,6 +16,7 @@ limitations under the License.
 
 import { Mjolnir, STATE_CHECKING_PERMISSIONS, STATE_NOT_STARTED, STATE_RUNNING, STATE_SYNCING } from "../Mjolnir";
 import { RichReply } from "matrix-bot-sdk";
+import { RECOMMENDATION_UNBAN } from "../models/ListRule";
 
 // !mjolnir
 export async function execStatusCommand(roomId: string, event: any, mjolnir: Mjolnir) {
@@ -54,7 +55,7 @@ export async function execStatusCommand(roomId: string, event: any, mjolnir: Mjo
     html += "<b>Subscribed ban lists:</b><br><ul>";
     text += "Subscribed ban lists:\n";
     for (const list of mjolnir.lists) {
-        const ruleInfo = `rules: ${list.serverRules.length} servers, ${list.userRules.length} users, ${list.roomRules.length} rooms`;
+        const ruleInfo = `rules: ${list.serverRules.filter(x => x.recommendation !== RECOMMENDATION_UNBAN).length} servers, ${list.userRules.filter(x => x.recommendation !== RECOMMENDATION_UNBAN).length} users, ${list.roomRules.filter(x => x.recommendation !== RECOMMENDATION_UNBAN).length} rooms`;
         html += `<li><a href="${list.roomRef}">${list.roomId}</a> (${ruleInfo})</li>`;
         text += `* ${list.roomRef} (${ruleInfo})\n`;
     }

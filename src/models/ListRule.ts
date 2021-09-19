@@ -17,9 +17,11 @@ limitations under the License.
 import { MatrixGlob } from "matrix-bot-sdk";
 
 export const RECOMMENDATION_BAN = "m.ban";
+export const RECOMMENDATION_UNBAN = "m.unban";
 export const RECOMMENDATION_BAN_TYPES = [RECOMMENDATION_BAN, "org.matrix.mjolnir.ban"];
+export const RECOMMENDATION_UNBAN_TYPES = [RECOMMENDATION_UNBAN, "org.matrix.mjolnir.unban"];
 
-export function recommendationToStable(recommendation: string, unstable = true): string|null {
+export function recommendationToStable(recommendation: string, unstable = true): string | null {
     if (RECOMMENDATION_BAN_TYPES.includes(recommendation)) return unstable ? RECOMMENDATION_BAN_TYPES[RECOMMENDATION_BAN_TYPES.length - 1] : RECOMMENDATION_BAN;
     return null;
 }
@@ -28,19 +30,24 @@ export class ListRule {
 
     private glob: MatrixGlob;
 
-    constructor(public readonly entity: string, private action: string, public readonly reason: string, public readonly kind: string) {
+    constructor(public readonly entity: string, private action: string, public readonly reason: string, public readonly kind: string, public readonly age: number) {
         this.glob = new MatrixGlob(entity);
     }
 
     /**
      * The recommendation for this rule, or `null` if there is no recommendation or the recommendation is invalid.
      */
-    public get recommendation(): string|null {
+    public get recommendation(): string | null {
+        if (RECOMMENDATION_UNBAN_TYPES.includes(this.action)) return RECOMMENDATION_UNBAN;
         if (RECOMMENDATION_BAN_TYPES.includes(this.action)) return RECOMMENDATION_BAN;
         return null;
     }
 
-    public isMatch(entity: string): boolean {
-        return this.glob.test(entity);
+    public isBannedMatch(entity: string): boolean {
+        return this.glob.test(entity) && this.recommendation === RECOMMENDATION_BAN;
+    }
+
+    public isUnbannedMatch(entity: string): boolean {
+        return this.glob.test(entity) && this.recommendation === RECOMMENDATION_UNBAN;
     }
 }

@@ -42,24 +42,24 @@ export async function applyUserBans(lists: BanList[], roomIds: string[], mjolnir
             if (config.fasterMembershipChecks) {
                 const memberIds = await mjolnir.client.getJoinedRoomMembers(roomId);
                 members = memberIds.map(u => {
-                    return {userId: u, membership: "join"};
+                    return { userId: u, membership: "join" };
                 });
             } else {
                 const state = await mjolnir.client.getRoomState(roomId);
                 members = state.filter(s => s['type'] === 'm.room.member' && !!s['state_key']).map(s => {
-                    return {userId: s['state_key'], membership: s['content'] ? s['content']['membership'] : 'leave'};
+                    return { userId: s['state_key'], membership: s['content'] ? s['content']['membership'] : 'leave' };
                 });
             }
 
             for (const member of members) {
-                if (member.membership === 'ban') {
-                    continue; // user already banned
-                }
 
-                let banned = false;
+                let rule_applied = false;
                 for (const list of lists) {
                     for (const userRule of list.userRules) {
-                        if (userRule.isMatch(member.userId)) {
+                        if (userRule.isBannedMatch(member.userId)) {
+                            if (member.membership === 'ban') {
+                                continue;
+                            }
                             // User needs to be banned
 
                             // We specifically use sendNotice to avoid having to escape HTML
@@ -74,12 +74,25 @@ export async function applyUserBans(lists: BanList[], roomIds: string[], mjolnir
                                 await logMessage(LogLevel.WARN, "ApplyBan", `Tried to ban ${member.userId} in ${roomId} but Mjolnir is running in no-op mode`, roomId);
                             }
 
-                            banned = true;
+                            rule_applied = true;
+                            break;
+                        } else if (userRule.isUnbannedMatch(member.userId)) {
+                            if (member.membership !== 'ban') {
+                                continue;
+                            }
+                            await logMessage(LogLevel.INFO, "ApplyUnBan", `Unbanning ${member.userId} in ${roomId} for: ${userRule.reason}`, roomId);
+                            if (!config.noop) {
+                                await mjolnir.client.unbanUser(member.userId, roomId);
+                            } else {
+                                await logMessage(LogLevel.WARN, "ApplyUnBan", `Tried to unban ${member.userId} in ${roomId} but Mjolnir is running in no-op mode`, roomId);
+                            }
+                            rule_applied = true;
                             break;
                         }
                     }
-                    if (banned) break;
+                    if (rule_applied) break;
                 }
+                //if (rule_applied) break;
             }
         } catch (e) {
             const message = e.message || (e.body ? e.body.error : '<no message>');

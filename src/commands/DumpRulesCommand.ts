@@ -17,6 +17,7 @@ limitations under the License.
 import { Mjolnir } from "../Mjolnir";
 import { RichReply } from "matrix-bot-sdk";
 import * as htmlEscape from "escape-html";
+import { RECOMMENDATION_UNBAN } from "../models/ListRule";
 
 // !mjolnir rules
 export async function execDumpRulesCommand(roomId: string, event: any, mjolnir: Mjolnir) {
@@ -33,19 +34,19 @@ export async function execDumpRulesCommand(roomId: string, event: any, mjolnir: 
         html += `<a href="${list.roomRef}">${list.roomId}</a>${shortcodeInfo}:<br/><ul>`;
         text += `${list.roomRef}${shortcodeInfo}:\n`;
 
-        for (const rule of list.serverRules) {
+        for (const rule of list.serverRules.filter(x => x.recommendation !== RECOMMENDATION_UNBAN)) {
             hasRules = true;
             html += `<li>server (<code>${rule.recommendation}</code>): <code>${htmlEscape(rule.entity)}</code> (${htmlEscape(rule.reason)})</li>`;
             text += `* server (${rule.recommendation}): ${rule.entity} (${rule.reason})\n`;
         }
 
-        for (const rule of list.userRules) {
+        for (const rule of list.userRules.filter(x => x.recommendation !== RECOMMENDATION_UNBAN)) {
             hasRules = true;
             html += `<li>user (<code>${rule.recommendation}</code>): <code>${htmlEscape(rule.entity)}</code> (${htmlEscape(rule.reason)})</li>`;
             text += `* user (${rule.recommendation}): ${rule.entity} (${rule.reason})\n`;
         }
 
-        for (const rule of list.roomRules) {
+        for (const rule of list.roomRules.filter(x => x.recommendation !== RECOMMENDATION_UNBAN)) {
             hasRules = true;
             html += `<li>room (<code>${rule.recommendation}</code>): <code>${htmlEscape(rule.entity)}</code> (${htmlEscape(rule.reason)})</li>`;
             text += `* room (${rule.recommendation}): ${rule.entity} (${rule.reason})\n`;

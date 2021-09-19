@@ -28,7 +28,7 @@ export const ALL_RULE_TYPES = [...USER_RULE_TYPES, ...ROOM_RULE_TYPES, ...SERVER
 
 export const SHORTCODE_EVENT_TYPE = "org.matrix.mjolnir.shortcode";
 
-export function ruleTypeToStable(rule: string, unstable = true): string|null {
+export function ruleTypeToStable(rule: string, unstable = true): string | null {
     if (USER_RULE_TYPES.includes(rule)) return unstable ? USER_RULE_TYPES[USER_RULE_TYPES.length - 1] : RULE_USER;
     if (ROOM_RULE_TYPES.includes(rule)) return unstable ? ROOM_RULE_TYPES[ROOM_RULE_TYPES.length - 1] : RULE_ROOM;
     if (SERVER_RULE_TYPES.includes(rule)) return unstable ? SERVER_RULE_TYPES[SERVER_RULE_TYPES.length - 1] : RULE_SERVER;
@@ -37,7 +37,7 @@ export function ruleTypeToStable(rule: string, unstable = true): string|null {
 
 export default class BanList {
     private rules: ListRule[] = [];
-    private shortcode: string|null = null;
+    private shortcode: string | null = null;
 
     constructor(public readonly roomId: string, public readonly roomRef, private client: MatrixClient) {
     }
@@ -49,7 +49,7 @@ export default class BanList {
     public set listShortcode(newShortcode: string) {
         const currentShortcode = this.shortcode;
         this.shortcode = newShortcode;
-        this.client.sendStateEvent(this.roomId, SHORTCODE_EVENT_TYPE, '', {shortcode: this.shortcode}).catch(err => {
+        this.client.sendStateEvent(this.roomId, SHORTCODE_EVENT_TYPE, '', { shortcode: this.shortcode }).catch(err => {
             LogService.error("BanList", extractRequestError(err));
             if (this.shortcode === newShortcode) this.shortcode = currentShortcode;
         });
@@ -85,7 +85,7 @@ export default class BanList {
                 continue;
             }
 
-            let kind: string|null = null;
+            let kind: string | null = null;
             if (USER_RULE_TYPES.includes(event['type'])) {
                 kind = RULE_USER;
             } else if (ROOM_RULE_TYPES.includes(event['type'])) {
@@ -97,18 +97,49 @@ export default class BanList {
             }
 
             // It's a rule - parse it
-            const content = event['content'];
-            if (!content) continue;
-
-            const entity = content['entity'];
-            const recommendation = content['recommendation'];
-            const reason = content['reason'] || '<no reason>';
-
-            if (!entity || !recommendation) {
+            const content: object | null = event['content'];
+            if (!content) {
+                const entity = event['state_key'].replace('rule:', '');
+                const recommendation = "org.matrix.mjolnir.unban";
+                const reason = '<no reason>';
+                this.rules.push(new ListRule(entity, recommendation, reason, kind, event["origin_server_ts"] as number));
                 continue;
             }
 
-            this.rules.push(new ListRule(entity, recommendation, reason, kind));
+            let entity = content['entity'];
+            let recommendation = content['recommendation'];
+            let reason = content['reason'] || '<no reason>';
+
+            if (!entity) {
+                console.log(`entity missing: ${JSON.stringify(entity)}`);
+                console.log(`entity missing recommendation: ${JSON.stringify(recommendation)}`);
+                entity = event['state_key'].replace('rule:', '');
+                recommendation = "org.matrix.mjolnir.unban";
+                console.log(`entity set after missing: ${JSON.stringify(entity)}`);
+                console.log(`recommendation set after entity missing: ${JSON.stringify(recommendation)}`);
+            }
+            if (!recommendation) {
+                recommendation = "org.matrix.mjolnir.unban";
+            }
+
+            const isKnown = (element) => {
+                if (!element) {
+                    return false;
+                }
+                return element.entity === entity;
+            };
+            let old_rule_index = this.rules.findIndex(isKnown);
+            let old_rule = this.rules.find(isKnown);
+            if (old_rule_index !== -1) {
+                console.log(`element index: ${old_rule_index}`);
+                let new_event_age = event["origin_server_ts"] as number;
+                if (new_event_age > old_rule!.age) {
+                    delete this.rules[old_rule_index];
+                    this.rules.push(new ListRule(entity, recommendation, reason, kind, event["origin_server_ts"] as number));
+                }
+            } else {
+                this.rules.push(new ListRule(entity, recommendation, reason, kind, event["origin_server_ts"] as number));
+            }
         }
     }
 }
